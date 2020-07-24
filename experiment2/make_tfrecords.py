@@ -27,7 +27,7 @@ from batchmaker import stim_maker_fn
 ##################################
 #       Extra parameters:        #
 ##################################
-training = 0
+training = 1
 testing = 1
 testing_crowding = 1
 

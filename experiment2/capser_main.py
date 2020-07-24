@@ -16,8 +16,8 @@ import tensorflow as tf
 import os
 
 # Optional: use Beholder to check on weights during training in tensorboard
-#from tensorboard.plugins.beholder import Beholder
-#from tensorboard.plugins.beholder import BeholderHook
+from tensorboard.plugins.beholder import Beholder
+from tensorboard.plugins.beholder import BeholderHook
 
 from parameters import parameters
 from capser_model_fn import model_fn
@@ -82,8 +82,8 @@ for idx_execution in range(n_iterations):
     logging.getLogger().setLevel(logging.INFO)
 
     # Optional: use Beholder to check on weights during training in tensorboard
-#    beholder = Beholder(log_dir)
-#    beholder_hook = BeholderHook(log_dir)
+    beholder = Beholder(log_dir)
+    beholder_hook = BeholderHook(log_dir)
 
     # Create the estimator (Retain the 2 most recent checkpoints)
     checkpointing_config = tf.estimator.RunConfig(keep_checkpoint_max = 2)
