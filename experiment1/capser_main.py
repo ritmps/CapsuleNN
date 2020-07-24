@@ -16,8 +16,8 @@ import os
 import re
 
 # Optional: use Beholder to check on weights during training in tensorboard
-#from tensorboard.plugins.beholder import Beholder
-#from tensorboard.plugins.beholder import BeholderHook
+from tensorboard.plugins.beholder import Beholder
+from tensorboard.plugins.beholder import BeholderHook
 
 from parameters import parameters
 from capser_model_fn import capser_model_fn, cnn_model_fn
@@ -28,7 +28,7 @@ from capser_functions import save_params, plot_uncrowding_results
 print('-------------------------------------------------------')
 print('TF version:', tf.__version__)
 print('Starting capsnet script...')
-print('Chosen net_tyoe procedure:', parameters.net_type)
+print('Chosen net_type procedure:', parameters.net_type)
 print('Chosen training procedure:', parameters.train_procedure)
 print('-------------------------------------------------------')
 
@@ -81,17 +81,17 @@ results = np.zeros(shape=(n_categories, n_idx, n_iterations))
 model_fn = capser_model_fn if parameters.net_type.lower() == 'capsnet' else cnn_model_fn
 for idx_execution in range(n_iterations):
     log_dir = parameters.logdir + str(idx_execution) + '/'
-    
+
     ##################################
     #    Training and evaluation:    #
     ##################################
     # Output the loss in the terminal every few steps:
     logging.getLogger().setLevel(logging.INFO)
-    
+
     # Optional: use Beholder to check on weights during training in tensorboard
-#    beholder = Beholder(log_dir)
-#    beholder_hook = BeholderHook(log_dir)
-    
+    beholder = Beholder(log_dir)
+    beholder_hook = BeholderHook(log_dir)
+
     # Create the estimator (Retain the 2 most recent checkpoints)
     checkpointing_config = tf.estimator.RunConfig(keep_checkpoint_max=2)
 
@@ -101,20 +101,19 @@ for idx_execution in range(n_iterations):
     eval_spec = tf.estimator.EvalSpec(lambda: eval_input_fn(parameters.val_data_path),
                                       steps=parameters.eval_steps,
                                       throttle_secs=parameters.eval_throttle_secs)
-    
-    
-    for idx_round in range(1, n_rounds+1):
+
+    for idx_round in range(1, n_rounds + 1):
         # Train for n_steps*n_rounds but testing after each round
         train_spec = tf.estimator.TrainSpec(train_input_fn,
-                                            max_steps=parameters.n_steps*idx_round)
+                                            max_steps=parameters.n_steps * idx_round)
         tf.estimator.train_and_evaluate(capser, train_spec, eval_spec)
-    
+
         ##################################
         #     Testing / Predictions:     #
         ##################################
         # Lets have less logs:
-        logging.getLogger().setLevel(logging.CRITICAL)        
-        
+        logging.getLogger().setLevel(logging.CRITICAL)
+
         # Testing for each test stimulus category:
         cats = []
         res = []
@@ -123,13 +122,13 @@ for idx_execution in range(n_iterations):
             cats.append(category[21:])
             print('-------------------------------------------------------')
             print('Compute vernier offset for ' + category)
-            
+
             results0 = np.zeros(shape=(n_idx,))
             for stim_idx in range(n_idx):
                 # Load relevant tfrecord test stimulus file
                 test_filename = category + '/' + str(stim_idx) + '.tfrecords'
-                
-                # Lets get all the network performance results we need:                
+
+                # Lets get all the network performance results we need:
                 capser = tf.estimator.Estimator(model_fn=model_fn, model_dir=log_dir,
                                                 params={'log_dir': log_dir,
                                                         'get_reconstructions': False})
@@ -137,7 +136,7 @@ for idx_execution in range(n_iterations):
                 vernier_accuracy = [p['vernier_accuracy'] for p in capser_out]
                 rank_pred_shapes = [p['rank_pred_shapes'] for p in capser_out]
                 rank_pred_proba = [p['rank_pred_proba'] for p in capser_out]
-                
+
                 # Get all the results per round:
                 results0[stim_idx] = np.mean(vernier_accuracy)
                 results1 = np.unique(rank_pred_shapes)
@@ -146,31 +145,30 @@ for idx_execution in range(n_iterations):
 
                 print('Finished calculations for stimulus type ' + str(stim_idx))
                 print('Result: ' + str(results0[stim_idx]) + '; test_samples used: ' + str(len(vernier_accuracy)))
-                
+
                 # Save ranking results (which shapes did the network recognize
                 # with the highest probabilities?):
-                txt_ranking_file_name = log_dir + '/ranking_step_' + str(parameters.n_steps*idx_round) + '.txt'
+                txt_ranking_file_name = log_dir + '/ranking_step_' + str(parameters.n_steps * idx_round) + '.txt'
                 if not os.path.exists(txt_ranking_file_name):
                     with open(txt_ranking_file_name, 'w') as f:
                         f.write(category + str(stim_idx) + ' : \t' + str(results1) + ' : \t' + str(results2) + '\n')
                 else:
                     with open(txt_ranking_file_name, 'a') as f:
                         f.write(category + str(stim_idx) + ' : \t' + str(results1) + ' : \t' + str(results2) + '\n')
-            
+
             # Save network performance results:
-            txt_file_name = log_dir + '/uncrowding_results_step_' + str(parameters.n_steps*idx_round) + \
-            '_noise_' + str(parameters.test_noise[0]) + '_' + str(parameters.test_noise[1]) + '.txt'
+            txt_file_name = log_dir + '/uncrowding_results_step_' + str(parameters.n_steps * idx_round) + \
+                '_noise_' + str(parameters.test_noise[0]) + '_' + str(parameters.test_noise[1]) + '.txt'
             if not os.path.exists(txt_file_name):
                 with open(txt_file_name, 'w') as f:
                     f.write(category + ' : \t' + str(results0) + '\n')
             else:
                 with open(txt_file_name, 'a') as f:
                     f.write(category + ' : \t' + str(results0) + '\n')
-        
+
         # Plot and save crowding/uncrowding results:
         plot_uncrowding_results(res, cats, n_idx,
-                                save=log_dir + '/uncrowding_results_step_' + str(parameters.n_steps*idx_round) +
-                                '_noise_' + str(parameters.test_noise[0]) + '_' + str(parameters.test_noise[1]) + '.png')
+                                save=log_dir + '/uncrowding_results_step_' + str(parameters.n_steps * idx_round) + '_noise_' + str(parameters.test_noise[0]) + '_' + str(parameters.test_noise[1]) + '.png')
 
 
 ###########################
@@ -185,8 +183,8 @@ for idx_execution in range(n_iterations):
 
     for n_category in range(n_categories):
         # Getting the data:
-        txt_file_name = log_dir_results + '/uncrowding_results_step_' + str(parameters.n_steps*n_rounds) + \
-        '_noise_' + str(parameters.test_noise[0]) + '_' + str(parameters.test_noise[1]) + '.txt'
+        txt_file_name = log_dir_results + '/uncrowding_results_step_' + str(parameters.n_steps * n_rounds) + \
+            '_noise_' + str(parameters.test_noise[0]) + '_' + str(parameters.test_noise[1]) + '.txt'
 
         with open(txt_file_name, 'r') as f:
             lines = f.read()
@@ -194,8 +192,8 @@ for idx_execution in range(n_iterations):
             numbers = np.float32(numbers)
             # Since the categories 4stars and 6stars involve numbers that are not
             # part of the performance, we get rid of them:
-            numbers = numbers[numbers!=4]
-            numbers = numbers[numbers!=6]
+            numbers = numbers[numbers != 4]
+            numbers = numbers[numbers != 6]
             results[:, :, idx_execution] = np.reshape(numbers, [-1, n_idx])
 
 # Save final means:
